@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="de.bembelnaut.spike.accountmanager">
+
+    <uses-permission
+        android:name="android.permission.GET_ACCOUNTS"
+        android:maxSdkVersion="22" />
+
+    <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
+
+    <uses-permission
+        android:name="android.permission.MANAGE_ACCOUNTS"
+        android:maxSdkVersion="22" />
+
+    <uses-permission
+        android:name="android.permission.USE_CREDENTIALS"
+        android:maxSdkVersion="22" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".App"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AccountManagerSpike">
+
+        <!-- Main activity to demonstrate -->
+        <activity
+            android:name="de.bembelnaut.spike.accountmanager.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Intent for authentication -->
+        <activity android:name="de.bembelnaut.spike.accountmanager.authenticator.AuthenticatorActivity" />
+
+        <!-- service for authentication -->
+        <service
+            android:name="de.bembelnaut.spike.accountmanager.authenticator.AuthenticatorService"
+            android:exported="false">
+            <intent-filter>
+                <!-- let android know for what kind of service is the intend -->
+                <action android:name="android.accounts.AccountAuthenticator" />
+            </intent-filter>
+
+            <!-- some additional data stored in the xml -->
+            <meta-data
+                android:name="android.accounts.AccountAuthenticator"
+                android:resource="@xml/authenticator" />
+        </service>
+    </application>
+
+</manifest>
