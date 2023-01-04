@@ -1,4 +1,4 @@
-package de.bembelnaut.spike.accountmanager.remote.model
+package de.bembelnaut.spike.accountmanager.authenticator.remote.model
 
 import com.google.gson.annotations.SerializedName
 

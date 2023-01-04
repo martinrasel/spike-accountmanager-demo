@@ -9,8 +9,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import com.google.gson.JsonObject
-import de.bembelnaut.spike.accountmanager.AccountHelper
-import de.bembelnaut.spike.accountmanager.remote.ApiUtil
+import de.bembelnaut.spike.accountmanager.authenticator.remote.ApiUtil
 
 /**
  * The Service itself to get in interaction with the user and the auth services.
@@ -24,9 +23,7 @@ class Authenticator(
     private val TAG = "Authenticator"
 
     /**
-     * Function is called after the method AccountManager.addAccountExplicitly() is called.
-     *
-     * The function itself returns an intent, that will be started from the account manager.
+     * Function called when method addAccount of AccountManager is called
      */
     override fun addAccount(
         response: AccountAuthenticatorResponse?,
@@ -37,10 +34,11 @@ class Authenticator(
     ): Bundle {
         Log.d(TAG, "addAccount()")
 
-        // here is out user - service - interaction
         val intent = Intent(context, AuthenticatorActivity::class.java).apply {
-            putExtra(AccountManager.KEY_ACCOUNT_TYPE, accountType)
             putExtra(AccountManager.KEY_ACCOUNT_AUTHENTICATOR_RESPONSE, response)
+            putExtra(AccountManager.KEY_ACCOUNT_TYPE, accountType)
+            putExtra(AuthenticatorActivity.PARAM_AUTH_TOKEN_TYPE, accountTokenType)
+            putExtra(AuthenticatorActivity.PARAM_NEW_ACCOUNT, true)
         }
 
         return Bundle().also {
@@ -62,6 +60,8 @@ class Authenticator(
         options: Bundle?
     ): Bundle {
         Log.d(TAG, "getAuthToken()")
+        // Extract the username and password from the Account Manager, and ask
+        // the server for an appropriate AuthToken.
 
         val accountManager = AccountHelper.getAccountManager()
         var token = accountManager?.peekAuthToken(account, authTokenType)
@@ -70,31 +70,29 @@ class Authenticator(
         if (token.isNullOrEmpty()) {
             Log.d(TAG, "getAuthToken(): Auth token not available. Get a new one...")
 
-            // Get the password
-            val pw = AccountHelper.getPassword(account)
-            if (!pw.isNullOrEmpty()) {
+            // Lets give another try to authenticate the user
+            account?.let {
+                val pw = AccountHelper.AuthenticatorActions.getPassword(it)
+                if (!pw.isNullOrEmpty()) {
 
-                // TODO: replace retrofit with dummy.
-                val body = JsonObject().apply {
-                    addProperty("id", account?.name) // Account.getName() == ID
-                    addProperty("pw", pw)
-                }
+                    // TODO: replace with service.
+                    val body = JsonObject().apply {
+                        addProperty("id", it.name) // Account.getName() == ID
+                        addProperty("pw", pw)
+                    }
 
-                val apiResponse = ApiUtil.getApiService().login(body).execute()
-                if (apiResponse.isSuccessful) {
-                    val auth = apiResponse.body()
+                    val apiResponse = ApiUtil.apiService.login(body).execute()
+                    if (apiResponse.isSuccessful) {
+                        val auth = apiResponse.body()
 
-                    token = auth?.authToken
+                        token = auth?.authToken
+                    }
                 }
             }
         }
 
-        // store the token
+        // If we get an authToken - we return it
         return if (!token.isNullOrEmpty()) {
-            // TODO: why saving all the time?
-            Log.d(TAG, "getAuthToken(): Save the new auth token")
-            AccountHelper.setAuthToken(account, token)
-
             // return the token
             Bundle().also {
                 it.putString(AccountManager.KEY_ACCOUNT_NAME, account?.name)
@@ -102,9 +100,17 @@ class Authenticator(
                 it.putString(AccountManager.KEY_AUTHTOKEN, token)
             }
         } else {
-            // try to login new, e.g. the account manager have the wrong password stored
+            // If we get here, then we couldn't access the user's password - so we
+            // need to re-prompt them for their credentials. We do that by creating
+            // an intent to display our AuthenticatorActivity.
             val intent = Intent(context, AuthenticatorActivity::class.java).apply {
                 putExtra(AccountManager.KEY_ACCOUNT_AUTHENTICATOR_RESPONSE, response)
+                putExtra(AuthenticatorActivity.PARAM_AUTH_TOKEN_TYPE, authTokenType)
+
+                account?.let {
+                    putExtra(AccountManager.KEY_ACCOUNT_TYPE, it.type)
+                    putExtra(AccountManager.KEY_ACCOUNT_NAME, it.name)
+                }
             }
 
             Bundle().also {
@@ -113,64 +119,39 @@ class Authenticator(
         }
     }
 
-    /**
-     * TODO: i don't know when it is called and whats the purpose
-     */
     override fun confirmCredentials(
         response: AccountAuthenticatorResponse?,
         account: Account?,
         options: Bundle?
     ): Bundle? {
-        // TODO: when is this method called?
-        Log.d(TAG, "confirmCredentials()")
         return null
     }
 
-    /**
-     * TODO: i don't know when it is called and whats the purpose
-     */
     override fun getAuthTokenLabel(p0: String?): String? {
-        // TODO: when is this method called?
-        Log.d(TAG, "getAuthTokenLabel(): $p0")
         return null
     }
 
-    /**
-     * TODO: i don't know when it is called and whats the purpose
-     */
     override fun updateCredentials(
         response: AccountAuthenticatorResponse?,
         account: Account?,
         authTokenType: String?,
         options: Bundle?
     ): Bundle? {
-        // TODO: when is this method called?
-        Log.d(TAG, "updateCredentials()")
         return null
     }
 
-    /**
-     * TODO: i don't know when it is called and whats the purpose
-     */
     override fun hasFeatures(
         response: AccountAuthenticatorResponse?,
         account: Account?,
         features: Array<out String>?
     ): Bundle? {
-        // TODO: when is this method called?
-        Log.d(TAG, "hasFeatures()")
         return null
     }
 
-    /**
-     * TODO: i don't know when it is called and whats the purpose
-     */
     override fun editProperties(
         response: AccountAuthenticatorResponse?,
         accountType: String?
     ): Bundle? {
-        // TODO: when is this method called?
-        Log.d(TAG, "editProperties()")
         return null
     }
 }

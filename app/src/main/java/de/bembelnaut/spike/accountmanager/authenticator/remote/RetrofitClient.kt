@@ -1,4 +1,4 @@
-package de.bembelnaut.spike.accountmanager.remote
+package de.bembelnaut.spike.accountmanager.authenticator.remote
 
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
