@@ -8,8 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import com.google.gson.JsonObject
-import de.bembelnaut.spike.accountmanager.authenticator.remote.ApiUtil
 
 /**
  * The Service itself to get in interaction with the user and the auth services.
@@ -21,6 +19,7 @@ class Authenticator(
 ) : AbstractAccountAuthenticator(context) {
 
     private val TAG = "Authenticator"
+    private val loginService = LoginService()
 
     /**
      * Function called when method addAccount of AccountManager is called
@@ -36,7 +35,7 @@ class Authenticator(
 
         val intent = Intent(context, AuthenticatorActivity::class.java).apply {
             putExtra(AccountManager.KEY_ACCOUNT_AUTHENTICATOR_RESPONSE, response)
-            putExtra(AccountManager.KEY_ACCOUNT_TYPE, accountType)
+            putExtra(AuthenticatorActivity.PARAM_ACCOUNT_TYPE, accountType)
             putExtra(AuthenticatorActivity.PARAM_AUTH_TOKEN_TYPE, accountTokenType)
             putExtra(AuthenticatorActivity.PARAM_NEW_ACCOUNT, true)
         }
@@ -60,33 +59,36 @@ class Authenticator(
         options: Bundle?
     ): Bundle {
         Log.d(TAG, "getAuthToken()")
+         // If the caller requested an authToken type we don't support, then
+        // return an error
+        if (!authTokenType.equals(Constance.AUTH_TOKEN_TYPE)) {
+            return Bundle().also {
+                it.putString(AccountManager.KEY_ERROR_MESSAGE, "invalid authTokenType")
+            }
+        }
+
         // Extract the username and password from the Account Manager, and ask
         // the server for an appropriate AuthToken.
-
-        val accountManager = AccountHelper.getAccountManager()
+        val accountManager = AccountManager.get(context)
         var token = accountManager?.peekAuthToken(account, authTokenType)
+        Log.d(TAG, "peekAuthToken returned: $token");
 
         // oh no... the auth token is not available
         if (token.isNullOrEmpty()) {
             Log.d(TAG, "getAuthToken(): Auth token not available. Get a new one...")
 
             // Lets give another try to authenticate the user
-            account?.let {
-                val pw = AccountHelper.AuthenticatorActions.getPassword(it)
+            account?.let { it ->
+                val pw = accountManager.getPassword(it)
                 if (!pw.isNullOrEmpty()) {
-
-                    // TODO: replace with service.
-                    val body = JsonObject().apply {
-                        addProperty("id", it.name) // Account.getName() == ID
-                        addProperty("pw", pw)
-                    }
-
-                    val apiResponse = ApiUtil.apiService.login(body).execute()
-                    if (apiResponse.isSuccessful) {
-                        val auth = apiResponse.body()
-
-                        token = auth?.authToken
-                    }
+                    loginService.login(
+                        userName = account.name,
+                        password = pw,
+                        onSuccess = { authToken ->
+                            token = authToken
+                        },
+                        onFailure = { /*nothing*/ }
+                    )
                 }
             }
         }
@@ -108,8 +110,8 @@ class Authenticator(
                 putExtra(AuthenticatorActivity.PARAM_AUTH_TOKEN_TYPE, authTokenType)
 
                 account?.let {
-                    putExtra(AccountManager.KEY_ACCOUNT_TYPE, it.type)
-                    putExtra(AccountManager.KEY_ACCOUNT_NAME, it.name)
+                    putExtra(AuthenticatorActivity.PARAM_ACCOUNT_TYPE, it.type)
+                    putExtra(AuthenticatorActivity.PARAM_ACCOUNT_NAME, it.name)
                 }
             }
 
